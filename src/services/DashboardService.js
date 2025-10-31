@@ -2,6 +2,165 @@ const pool = require('../config/database');
 const moment = require('moment');
 
 class DashboardService {
+  // Opções de métricas pré-definidas para o dashboard dinâmico
+  static retrieveUniqueMetricOptions() {
+    // IDs estáveis para o frontend mapear seleções/consultas
+    return [
+      { id: 'average_ticket', description: 'Ticket médio' },
+      { id: 'total_sales', description: 'Quantidade total de vendas' },
+      { id: 'total_revenue', description: 'Faturamento total' },
+      { id: 'top_selling_products', description: 'Produtos mais vendidos' },
+      { id: 'revenue_by_hour', description: 'Faturamento por hora' },
+      { id: 'revenue_by_day', description: 'Faturamento por dia da semana' },
+      { id: 'sales_by_channel', description: 'Vendas por canal (Presencial vs Delivery)' },
+      { id: 'total_discounts', description: 'Total de descontos aplicados' },
+      { id: 'delivery_fees', description: 'Total de taxas de entrega' },
+      { id: 'people_quantity', description: 'Total de pessoas atendidas' },
+      { id: 'production_time_avg', description: 'Tempo médio de produção (s)' },
+      { id: 'delivery_time_avg', description: 'Tempo médio de entrega (s)' }
+    ];
+  }
+
+  // Utilitário interno para montar condições SQL com múltiplos filtros
+  static buildCommonWhere(filters = {}) {
+    const conditions = [];
+    const params = [];
+    let i = 0;
+
+    if (filters.store_ids && Array.isArray(filters.store_ids) && filters.store_ids.length > 0) {
+      i++;
+      conditions.push(`s.store_id = ANY($${i})`);
+      params.push(filters.store_ids);
+    } else if (filters.store_id) {
+      i++;
+      conditions.push(`s.store_id = $${i}`);
+      params.push(filters.store_id);
+    }
+
+    if (filters.channel_ids && Array.isArray(filters.channel_ids) && filters.channel_ids.length > 0) {
+      i++;
+      conditions.push(`s.channel_id = ANY($${i})`);
+      params.push(filters.channel_ids);
+    } else if (filters.channel_id) {
+      i++;
+      conditions.push(`s.channel_id = $${i}`);
+      params.push(filters.channel_id);
+    }
+
+    if (filters.sub_brand_id) {
+      i++;
+      conditions.push(`s.sub_brand_id = $${i}`);
+      params.push(filters.sub_brand_id);
+    }
+
+    if (filters.date_from) {
+      i++;
+      conditions.push(`s.created_at >= $${i}`);
+      params.push(filters.date_from);
+    }
+    if (filters.date_to) {
+      i++;
+      conditions.push(`s.created_at <= $${i}`);
+      params.push(filters.date_to);
+    }
+
+    const whereSql = conditions.length ? ' WHERE ' + conditions.join(' AND ') : '';
+    return { whereSql, params };
+  }
+
+  // Agregados genéricos para várias métricas simples
+  static async getAggregates(filters = {}) {
+    const base = `
+      SELECT 
+        COUNT(*)::bigint as total_sales,
+        COALESCE(SUM(s.total_amount), 0)::numeric as total_revenue,
+        COALESCE(AVG(s.total_amount), 0)::numeric as average_ticket,
+        COALESCE(SUM(s.total_discount), 0)::numeric as total_discounts,
+        COALESCE(SUM(s.delivery_fee), 0)::numeric as delivery_fees,
+        COALESCE(SUM(s.people_quantity), 0)::bigint as people_quantity,
+        COALESCE(AVG(s.production_seconds), 0)::numeric as production_time_avg,
+        COALESCE(AVG(s.delivery_seconds), 0)::numeric as delivery_time_avg
+      FROM sales s
+    `;
+    const { whereSql, params } = this.buildCommonWhere(filters);
+    const result = await pool.query(base + whereSql, params);
+    return result.rows[0];
+  }
+
+  // Consulta por IDs de métricas (múltiplas em paralelo)
+  static async queryByMetricOptionId(ids = [], stores = [], channels = [], period = {}) {
+    const filters = {};
+    if (Array.isArray(stores) && stores.length) filters.store_ids = stores.map(Number).filter(Boolean);
+    if (Array.isArray(channels) && channels.length) filters.channel_ids = channels.map(Number).filter(Boolean);
+    if (period && period.date_from) filters.date_from = period.date_from;
+    if (period && period.date_to) filters.date_to = period.date_to;
+
+    const uniqueIds = Array.from(new Set(ids));
+    const results = {};
+
+    // Pré-busca de agregados para métricas simples
+    let aggregates = null;
+    const needsAggregates = uniqueIds.some(id => [
+      'average_ticket', 'total_sales', 'total_revenue', 'total_discounts', 'delivery_fees', 'people_quantity',
+      'production_time_avg', 'delivery_time_avg'
+    ].includes(id));
+    if (needsAggregates) {
+      aggregates = await this.getAggregates(filters);
+    }
+
+    await Promise.all(uniqueIds.map(async (id) => {
+      switch (id) {
+        case 'average_ticket':
+          results[id] = { value: Number(aggregates.average_ticket) };
+          break;
+        case 'total_sales':
+          results[id] = { value: Number(aggregates.total_sales) };
+          break;
+        case 'total_revenue':
+          results[id] = { value: Number(aggregates.total_revenue) };
+          break;
+        case 'total_discounts':
+          results[id] = { value: Number(aggregates.total_discounts) };
+          break;
+        case 'delivery_fees':
+          results[id] = { value: Number(aggregates.delivery_fees) };
+          break;
+        case 'people_quantity':
+          results[id] = { value: Number(aggregates.people_quantity) };
+          break;
+        case 'production_time_avg':
+          results[id] = { value: Number(aggregates.production_time_avg) };
+          break;
+        case 'delivery_time_avg':
+          results[id] = { value: Number(aggregates.delivery_time_avg) };
+          break;
+        case 'top_selling_products': {
+          const data = await this.getTopSellingProducts(filters);
+          results[id] = { items: data };
+          break;
+        }
+        case 'revenue_by_hour': {
+          const data = await this.getRevenueByHour(filters);
+          results[id] = { items: data };
+          break;
+        }
+        case 'revenue_by_day': {
+          const data = await this.getRevenueByDayOfWeek(filters);
+          results[id] = { items: data };
+          break;
+        }
+        case 'sales_by_channel': {
+          const data = await this.getSalesByChannel(filters);
+          results[id] = { items: data };
+          break;
+        }
+        default:
+          results[id] = { error: 'unsupported_metric_id' };
+      }
+    }));
+
+    return results;
+  }
   // Ticket médio por período
   static async getAverageTicket(filters = {}) {
     let query = `

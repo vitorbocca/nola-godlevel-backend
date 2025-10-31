@@ -2,6 +2,107 @@ const express = require('express');
 const router = express.Router();
 const DashboardService = require('../services/DashboardService');
 const { validateDashboardFilters } = require('../middleware/validation');
+const { Router } = require('express');
+
+/**
+ * @swagger
+ * /api/dashboard/metric-options:
+ *   get:
+ *     summary: Lista de métricas disponíveis
+ *     description: Retorna opções únicas de métricas para o dashboard dinâmico
+ *     tags: [Dashboard]
+ *     responses:
+ *       200:
+ *         description: Opções de métricas retornadas com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                         example: average_ticket
+ *                       description:
+ *                         type: string
+ *                         example: Ticket médio
+ */
+router.get('/metric-options', async (req, res) => {
+  try {
+    const data = DashboardService.retrieveUniqueMetricOptions();
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('Erro ao buscar opções de métricas:', error);
+    res.status(500).json({ success: false, error: 'Erro interno do servidor' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/dashboard/query:
+ *   post:
+ *     summary: Consulta dinâmica por IDs de métricas
+ *     description: Retorna dados para uma ou mais métricas com filtros opcionais (lojas, canais, período)
+ *     tags: [Dashboard]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               ids:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 example: ["average_ticket", "top_selling_products"]
+ *               stores:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *                 example: [1, 2]
+ *               channels:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *                 example: [1, 3]
+ *               period:
+ *                 type: object
+ *                 properties:
+ *                   date_from:
+ *                     type: string
+ *                     example: "2024-01-01"
+ *                   date_to:
+ *                     type: string
+ *                     example: "2024-01-31"
+ *     responses:
+ *       200:
+ *         description: Dados de métricas retornados com sucesso
+ *       400:
+ *         description: Requisição inválida
+ *       500:
+ *         description: Erro interno do servidor
+ */
+router.post('/query', async (req, res) => {
+  try {
+    const { ids = [], stores = [], channels = [], period = {} } = req.body || {};
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, error: 'ids_required' });
+    }
+    const data = await DashboardService.queryByMetricOptionId(ids, stores, channels, period);
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('Erro na consulta dinâmica de métricas:', error);
+    res.status(500).json({ success: false, error: 'Erro interno do servidor' });
+  }
+});
 
 /**
  * @swagger
