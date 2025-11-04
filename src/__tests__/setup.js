@@ -1,5 +1,6 @@
 // Setup para testes Jest
-require('dotenv').config({ path: '.env.test' });
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.test' });
 
 // Mock do console.log para evitar logs durante os testes
 global.console = {

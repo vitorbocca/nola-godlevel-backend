@@ -1,6 +1,7 @@
-const express = require('express');
+import express from 'express';
+import Sale from '../models/Sale.js';
+
 const router = express.Router();
-const Sale = require('../models/Sale');
 
 /**
  * @swagger
@@ -313,5 +314,5 @@ router.get('/summary', async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;
 

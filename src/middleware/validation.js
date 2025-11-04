@@ -1,4 +1,4 @@
-const Joi = require('joi');
+import Joi from 'joi';
 
 // Validação para filtros do dashboard
 const validateDashboardFilters = (req, res, next) => {
@@ -138,7 +138,7 @@ const validateId = (req, res, next) => {
   next();
 };
 
-module.exports = {
+export {
   validateDashboardFilters,
   validateSale,
   validateProduct,

@@ -1,6 +1,7 @@
 {
   "name": "nola-godlevel-backend",
   "version": "1.0.0",
+  "type": "module",
   "description": "Backend API para dashboard de vendas",
   "main": "src/server.js",
   "scripts": {

@@ -1,6 +1,7 @@
-const express = require('express');
+import express from 'express';
+import Product from '../models/Product.js';
+
 const router = express.Router();
-const Product = require('../models/Product');
 
 /**
  * @swagger
@@ -266,5 +267,5 @@ router.get('/analytics/top-selling', async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;
 

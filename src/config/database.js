@@ -1,4 +1,4 @@
-const { Pool } = require('pg');
+import { Pool } from 'pg';
 
 const pool = new Pool({
   host: process.env.DB_HOST || 'localhost',
@@ -6,7 +6,7 @@ const pool = new Pool({
   database: process.env.POSTGRES_DB || process.env.DB_NAME || 'challenge_db',
   user: process.env.POSTGRES_USER || process.env.DB_USER || 'challenge',
   password: process.env.POSTGRES_PASSWORD || process.env.DB_PASSWORD || 'challenge_2024',
-  max: 20,
+  max: 5,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
 });
@@ -21,4 +21,4 @@ pool.on('error', (err) => {
   process.exit(-1);
 });
 
-module.exports = pool;
+export default pool;

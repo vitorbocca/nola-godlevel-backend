@@ -1,4 +1,4 @@
-const pool = require('../config/database');
+import pool from '../config/database.js';
 
 class Brand {
   static async findAll() {
@@ -34,5 +34,5 @@ class Brand {
   }
 }
 
-module.exports = Brand;
+export default Brand;
 
