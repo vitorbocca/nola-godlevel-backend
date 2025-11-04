@@ -52,6 +52,35 @@ app.use('/api/products', productsRoutes);
 app.use('/api/stores', storesRoutes);
 app.use('/api/channels', channelsRoutes);
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({
+    success: true,
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    version: '1.0.0'
+  });
+});
+
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: 'NOLA GodLevel Backend API',
+    version: '1.0.0',
+    endpoints: {
+      health: '/health',
+      docs: '/api-docs',
+      dashboard: '/api/dashboard',
+      sales: '/api/sales',
+      products: '/api/products',
+      stores: '/api/stores',
+      channels: '/api/channels'
+    }
+  });
+});
+
 // Middleware de tratamento de erros (omito o bloco, mas assumo que está no seu arquivo)
 
 // Iniciar servidor
